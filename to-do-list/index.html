@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline To-Do</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(to bottom, #1a1a3d, #2e2e5e);
+            font-family: 'Poppins', Arial, sans-serif;
+            color: #fff;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 700px;
+            position: relative;
+        }
+
+        .timeline {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            height: 100%;
+            z-index: 0;
+        }
+
+        .input-area {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .task-input, .due-date {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .task-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .priority-select {
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+        }
+
+        .add-btn {
+            padding: 10px 20px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .add-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .task-list {
+            position: relative;
+            z-index: 1;
+        }
+
+        .task {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            width: 280px;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .task.low { border-left: 5px solid #4caf50; }
+        .task.medium { border-left: 5px solid #ffca28; }
+        .task.high { border-left: 5px solid #ff5722; }
+
+        .task.completed {
+            background: #e6ffe6;
+            transform: rotate(2deg);
+        }
+
+        .task-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-text { font-weight: 500; }
+        .task-due { font-size: 12px; color: #666; }
+        .delete-btn { background: none; border: none; color: #ff4d4d; cursor: pointer; }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #ff6b6b;
+            animation: fall 2s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%) scale(0.8); opacity: 0; }
+            to { transform: translateX(0) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="timeline"></div>
+        <div class="input-area">
+            <input type="text" class="task-input" placeholder="Add a new task...">
+            <input type="date" class="due-date">
+            <select class="priority-select">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            <button class="add-btn">Add</button>
+        </div>
+        <div class="task-list"></div>
+    </div>
+
+    <script>
+        const taskInput = document.querySelector('.task-input');
+        const dueDate = document.querySelector('.due-date');
+        const prioritySelect = document.querySelector('.priority-select');
+        const addBtn = document.querySelector('.add-btn');
+        const taskList = document.querySelector('.task-list');
+        let tasks = [];
+
+        // Load from localStorage
+        if (localStorage.getItem('tasks')) {
+            tasks = JSON.parse(localStorage.getItem('tasks'));
+            renderTasks();
+        }
+
+        // Add task
+        addBtn.addEventListener('click', () => addTask());
+        taskInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        function addTask() {
+            const taskText = taskInput.value.trim();
+            if (!taskText) return;
+
+            const task = {
+                id: Date.now(),
+                text: taskText,
+                due: dueDate.value || 'No due date',
+                priority: prioritySelect.value,
+                completed: false,
+                position: tasks.length
+            };
+            tasks.push(task);
+            taskInput.value = '';
+            dueDate.value = '';
+            saveTasks();
+            renderTasks();
+        }
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            tasks.sort((a, b) => a.position - b.position).forEach((task, index) => {
+                const taskElement = document.createElement('div');
+                taskElement.classList.add('task', task.priority);
+                taskElement.draggable = true;
+                if (task.completed) taskElement.classList.add('completed');
+                taskElement.style.animation = 'slideIn 0.3s ease';
+
+                taskElement.innerHTML = `
+                    <div class="task-info">
+                        <span class="task-text">${task.text}</span>
+                        <button class="delete-btn">✕</button>
+                    </div>
+                    <span class="task-due">Due: ${task.due}</span>
+                `;
+
+                // Toggle completion
+                taskElement.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-btn')) return;
+                    task.completed = !task.completed;
+                    if (task.completed) spawnConfetti(e.clientX, e.clientY);
+                    saveTasks();
+                    renderTasks();
+                });
+
+                // Delete task
+                taskElement.querySelector('.delete-btn').addEventListener('click', () => {
+                    tasks = tasks.filter(t => t.id !== task.id);
+                    saveTasks();
+                    renderTasks();
+                });
+
+                // Draggable functionality
+                taskElement.addEventListener('dragstart', () => taskElement.classList.add('dragging'));
+                taskElement.addEventListener('dragend', () => {
+                    taskElement.classList.remove('dragging');
+                    updatePositions();
+                });
+
+                taskList.appendChild(taskElement);
+            });
+
+            // Drag and drop handling
+            taskList.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const dragging = document.querySelector('.dragging');
+                const afterElement = getDragAfterElement(taskList, e.clientY);
+                if (afterElement == null) {
+                    taskList.appendChild(dragging);
+                } else {
+                    taskList.insertBefore(dragging, afterElement);
+                }
+            });
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.task:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function updatePositions() {
+            const taskElements = taskList.querySelectorAll('.task');
+            tasks = Array.from(taskElements).map((el, index) => {
+                const task = tasks.find(t => t.id === parseInt(el.dataset.id || el.querySelector('.task-text').textContent));
+                task.position = index;
+                el.dataset.id = task.id;
+                return task;
+            });
+            saveTasks();
+        }
+
+        function spawnConfetti(x, y) {
+            for (let i = 0; i < 20; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.left = `${x + Math.random() * 50 - 25}px`;
+                confetti.style.top = `${y + Math.random() * 50 - 25}px`;
+                confetti.style.background = `hsl(${Math.random() * 360}, 70%, 50%)`;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 2000);
+            }
+        }
+
+        function saveTasks() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+    </script>
+</body>
+</html>
