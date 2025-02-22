@@ -18,7 +18,7 @@ A sleek and interactive to-do list with a timeline-inspired design! This project
 4. Drag to rearrange or click to mark as completed.  
 
 ## 📌 Live Demo  
-[Coming Soon / Add GitHub Pages Link]  
+https://timelinetodolist.netlify.app/
 
 🚀 Happy task managing!  
 
